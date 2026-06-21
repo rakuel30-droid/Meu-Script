@@ -1,9 +1,9 @@
 -- ============================================
--- AETHER HUB v1.0 - Estilo Gravity Hub
--- Para Delta Executor Mobile
+-- AETHER HUB v2.0 - DELTA OTIMIZADO
 -- ============================================
 
-local Aether = {}
+-- FORÇA O SCRIPT A RODAR NO AMBIENTE CORRETO
+local env = getgenv() or getfenv() or _ENV
 
 -- ============================================
 -- SERVIÇOS
@@ -11,8 +11,10 @@ local Aether = {}
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -22,44 +24,53 @@ local hrp = character:WaitForChild("HumanoidRootPart")
 -- ============================================
 -- CONFIGURAÇÕES
 -- ============================================
-Aether.Config = {
+local Config = {
     AutoFarm = false,
     AutoCollect = false,
     FastAttack = false,
     BringMobs = false,
     AutoHop = false,
     AutoBuso = false,
-    AutoFishing = false,
-    TeleportDelay = 0.3
+    AutoFishing = false
 }
 
 -- ============================================
--- NOTIFICAÇÃO DE INÍCIO
+-- FUNÇÃO DE NOTIFICAÇÃO
 -- ============================================
-StarterGui:SetCore("SendNotification", {
-    Title = "🚀 AETHER HUB",
-    Text = "Carregando...",
-    Duration = 2
-})
-
-wait(1)
+local function Notify(title, text, duration)
+    duration = duration or 3
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = duration
+        })
+    end)
+end
 
 -- ============================================
--- FUNÇÕES PRINCIPAIS
+-- FUNÇÃO DE CLICK (DELTA)
 -- ============================================
+local function MobileClick()
+    pcall(function()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+    wait(0.1)
+end
 
--- Teleporte
-function Aether:Teleportar(posicao)
+-- ============================================
+-- FUNÇÕES DE TELEPORTE
+-- ============================================
+local function Teleportar(posicao)
     if hrp then
         hrp.CFrame = CFrame.new(posicao)
-        wait(0.3)
+        wait(0.2)
         return true
     end
     return false
 end
 
--- Teleporte para Ilhas
-function Aether:TeleportarIlha(nome)
+local function TeleportarIlha(nome)
     local ilhas = {
         Inicial = Vector3.new(0, 10, 0),
         Medieval = Vector3.new(1000, 10, 2000),
@@ -73,88 +84,85 @@ function Aether:TeleportarIlha(nome)
     
     local pos = ilhas[nome]
     if pos then
-        Aether:Teleportar(pos)
-        StarterGui:SetCore("SendNotification", {
-            Title = "✅ Teleportado",
-            Text = "Ilha " .. nome,
-            Duration = 2
-        })
+        Teleportar(pos)
+        Notify("✅ Teleportado", "Ilha " .. nome, 2)
     end
 end
 
--- Coletar Frutas
-function Aether:ColetarFrutas()
+-- ============================================
+-- AUTO FARM
+-- ============================================
+local function AutoFarmLoop()
+    while Config.AutoFarm do
+        wait(0.5)
+        
+        local alvo = nil
+        local distMin = 999
+        
+        for _, obj in ipairs(Workspace:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+                if obj.Name ~= player.Name and obj:FindFirstChild("HumanoidRootPart") then
+                    local dist = (hrp.Position - obj.HumanoidRootPart.Position).Magnitude
+                    if dist < 200 and dist < distMin then
+                        distMin = dist
+                        alvo = obj
+                    end
+                end
+            end
+        end
+        
+        if alvo then
+            hrp.CFrame = CFrame.new(alvo.HumanoidRootPart.Position + Vector3.new(0, 0, 5))
+            wait(0.2)
+            MobileClick()
+            wait(0.3)
+        end
+    end
+end
+
+-- ============================================
+-- COLETA DE FRUTAS
+-- ============================================
+local function ColetarFrutas()
     for _, obj in ipairs(Workspace:GetChildren()) do
         if obj:IsA("Tool") and obj:FindFirstChild("Handle") then
             local dist = (hrp.Position - obj.Handle.Position).Magnitude
             if dist < 20 then
                 pcall(function()
                     obj.Parent = player.Backpack
-                    print("[Aether] Fruta coletada:", obj.Name)
+                    Notify("🍎 Coletado", obj.Name, 2)
                 end)
             end
         end
     end
 end
 
--- Auto Farm Simples
-function Aether:AutoFarmLoop()
-    spawn(function()
-        while Aether.Config.AutoFarm do
-            -- Procura inimigos próximos
-            local alvo = nil
-            local distMin = 999
-            
-            for _, obj in ipairs(Workspace:GetChildren()) do
-                if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
-                    if obj.Name ~= player.Name and obj:FindFirstChild("HumanoidRootPart") then
-                        local dist = (hrp.Position - obj.HumanoidRootPart.Position).Magnitude
-                        if dist < 200 and dist < distMin then
-                            distMin = dist
-                            alvo = obj
-                        end
-                    end
-                end
-            end
-            
-            if alvo then
-                -- Move para o alvo
-                hrp.CFrame = CFrame.new(alvo.HumanoidRootPart.Position + Vector3.new(0, 0, 5))
-                wait(0.2)
-                
-                -- Ataca
-                pcall(function()
-                    VirtualUser:ClickButton2(Vector2.new())
-                end)
-                
-                wait(0.5)
-            else
-                wait(1)
-            end
-            
-            wait(0.5)
-        end
-    end)
-end
-
 -- ============================================
--- CRIAÇÃO DA GUI (ESTILO GRAVITY HUB)
+-- CRIAÇÃO DA GUI (COM BORDAS RGB)
 -- ============================================
-function Aether:CriarGUI()
-    local playerGui = player:WaitForChild("PlayerGui")
+local function CriarGUI()
+    -- Aguarda o PlayerGui carregar
+    local playerGui = player:WaitForChild("PlayerGui", 5)
+    if not playerGui then
+        Notify("❌ Erro", "PlayerGui não encontrado", 3)
+        return
+    end
     
     -- ScreenGui Principal
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "AetherHub"
     screenGui.Parent = playerGui
     
-    -- Frame Principal
+    -- ============================================
+    -- FRAME PRINCIPAL COM BORDAS RGB
+    -- ============================================
     local mainFrame = Instance.new("Frame")
     mainFrame.Size = UDim2.new(0, 400, 0, 520)
     mainFrame.Position = UDim2.new(0.5, -200, 0.5, -260)
     mainFrame.BackgroundColor3 = Color3.fromRGB(15, 10, 30)
     mainFrame.BackgroundTransparency = 0.05
-    mainFrame.BorderSizePixel = 0
+    mainFrame.BorderSizePixel = 2
+    mainFrame.BorderColor3 = Color3.fromRGB(255, 0, 0) -- Vermelho inicial
     mainFrame.Parent = screenGui
     
     -- Cantos arredondados
@@ -162,7 +170,29 @@ function Aether:CriarGUI()
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
     
-    -- Gradiente
+    -- ============================================
+    -- ANIMAÇÃO RGB NAS BORDAS
+    -- ============================================
+    spawn(function()
+        local colors = {
+            Color3.fromRGB(255, 0, 0),    -- Vermelho
+            Color3.fromRGB(255, 165, 0),  -- Laranja
+            Color3.fromRGB(255, 255, 0),  -- Amarelo
+            Color3.fromRGB(0, 255, 0),    -- Verde
+            Color3.fromRGB(0, 0, 255),    -- Azul
+            Color3.fromRGB(75, 0, 130),   -- Índigo
+            Color3.fromRGB(238, 130, 238) -- Violeta
+        }
+        
+        local index = 1
+        while mainFrame and mainFrame.Parent do
+            mainFrame.BorderColor3 = colors[index]
+            index = index % #colors + 1
+            wait(0.5)
+        end
+    end)
+    
+    -- Gradiente de fundo
     local gradient = Instance.new("UIGradient")
     gradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 40, 140)),
@@ -185,7 +215,7 @@ function Aether:CriarGUI()
     local version = Instance.new("TextLabel")
     version.Size = UDim2.new(1, 0, 0, 20)
     version.Position = UDim2.new(0, 0, 0, 50)
-    version.Text = "Version 1.0 | Mobile"
+    version.Text = "Version 2.0 | Mobile"
     version.TextColor3 = Color3.fromRGB(150, 150, 200)
     version.TextScaled = true
     version.Font = Enum.Font.Gotham
@@ -226,10 +256,6 @@ function Aether:CriarGUI()
         tabButtons[i] = btn
     end
     
-    -- ============================================
-    -- CONTEÚDO DAS ABAS
-    -- ============================================
-    
     -- Container do conteúdo
     local contentContainer = Instance.new("Frame")
     contentContainer.Size = UDim2.new(1, -20, 1, -130)
@@ -255,7 +281,6 @@ function Aether:CriarGUI()
     homeTitle.BackgroundTransparency = 1
     homeTitle.Parent = homeContent
     
-    -- Status do Jogador
     local statusText = Instance.new("TextLabel")
     statusText.Size = UDim2.new(1, 0, 0, 80)
     statusText.Position = UDim2.new(0, 0, 0, 50)
@@ -267,14 +292,14 @@ function Aether:CriarGUI()
     statusText.TextXAlignment = Enum.TextXAlignment.Left
     statusText.Parent = homeContent
     
-    -- Atualiza status a cada 5 segundos
+    -- Atualiza status
     spawn(function()
         while true do
             local nivel = player:FindFirstChild("Data") and player.Data.Level.Value or 0
             local fruta = player:FindFirstChild("Data") and player.Data.Fruit.Value or "Nenhuma"
             statusText.Text = string.format("Nível: %d\nFruta: %s\nVida: %.0f/%.0f", 
                 nivel, fruta, humanoid.Health, humanoid.MaxHealth)
-            wait(5)
+            wait(3)
         end
     end)
     
@@ -297,7 +322,6 @@ function Aether:CriarGUI()
     farmTitle.BackgroundTransparency = 1
     farmTitle.Parent = farmContent
     
-    -- Botões de Farm
     local farmBotoes = {
         {texto = "▶ Auto Farm", cor = Color3.fromRGB(16, 185, 129), y = 50, chave = "AutoFarm"},
         {texto = "🔄 Auto Collect", cor = Color3.fromRGB(99, 102, 241), y = 100, chave = "AutoCollect"},
@@ -321,19 +345,15 @@ function Aether:CriarGUI()
         btnCorner.Parent = btn
         
         btn.MouseButton1Click:Connect(function()
-            Aether.Config[btnInfo.chave] = not Aether.Config[btnInfo.chave]
-            btn.Text = Aether.Config[btnInfo.chave] and "⏹ " .. btnInfo.texto:sub(3) or btnInfo.texto
-            btn.BackgroundColor3 = Aether.Config[btnInfo.chave] and Color3.fromRGB(239, 68, 68) or btnInfo.cor
+            Config[btnInfo.chave] = not Config[btnInfo.chave]
+            btn.Text = Config[btnInfo.chave] and "⏹ " .. btnInfo.texto:sub(3) or btnInfo.texto
+            btn.BackgroundColor3 = Config[btnInfo.chave] and Color3.fromRGB(239, 68, 68) or btnInfo.cor
             
-            if btnInfo.chave == "AutoFarm" and Aether.Config.AutoFarm then
-                Aether:AutoFarmLoop()
+            if btnInfo.chave == "AutoFarm" and Config.AutoFarm then
+                spawn(AutoFarmLoop)
             end
             
-            StarterGui:SetCore("SendNotification", {
-                Title = Aether.Config[btnInfo.chave] and "✅ Ativado" or "⏹ Desativado",
-                Text = btnInfo.texto:sub(3),
-                Duration = 2
-            })
+            Notify(Config[btnInfo.chave] and "✅ Ativado" or "⏹ Desativado", btnInfo.texto:sub(3), 2)
         end)
     end
     
@@ -356,7 +376,6 @@ function Aether:CriarGUI()
     teleportTitle.BackgroundTransparency = 1
     teleportTitle.Parent = teleportContent
     
-    -- Botões de Teleporte
     local teleportBotoes = {
         {texto = "🏝️ Inicial", cor = Color3.fromRGB(16, 185, 129), y = 50, ilha = "Inicial"},
         {texto = "🏰 Medieval", cor = Color3.fromRGB(99, 102, 241), y = 90, ilha = "Medieval"},
@@ -383,7 +402,7 @@ function Aether:CriarGUI()
         btnCorner.Parent = btn
         
         btn.MouseButton1Click:Connect(function()
-            Aether:TeleportarIlha(btnInfo.ilha)
+            TeleportarIlha(btnInfo.ilha)
         end)
     end
     
@@ -429,25 +448,13 @@ function Aether:CriarGUI()
         
         btn.MouseButton1Click:Connect(function()
             if btnInfo.texto == "🍎 Coletar Frutas" then
-                Aether:ColetarFrutas()
-                StarterGui:SetCore("SendNotification", {
-                    Title = "✅ Coletando",
-                    Text = "Procurando frutas...",
-                    Duration = 2
-                })
+                ColetarFrutas()
+                Notify("✅ Coletando", "Procurando frutas...", 2)
             elseif btnInfo.texto == "📦 Coletar Baús" then
-                StarterGui:SetCore("SendNotification", {
-                    Title = "📦 Coletando",
-                    Text = "Procurando baús...",
-                    Duration = 2
-                })
+                Notify("📦 Coletando", "Procurando baús...", 2)
             elseif btnInfo.texto == "🗺️ Coletar Tudo" then
-                Aether:ColetarFrutas()
-                StarterGui:SetCore("SendNotification", {
-                    Title = "🗺️ Coletando",
-                    Text = "Coletando todos os itens...",
-                    Duration = 2
-                })
+                ColetarFrutas()
+                Notify("🗺️ Coletando", "Coletando todos os itens...", 2)
             end
         end)
     end
@@ -493,15 +500,11 @@ function Aether:CriarGUI()
         btnCorner.Parent = btn
         
         btn.MouseButton1Click:Connect(function()
-            Aether.Config[btnInfo.chave] = not Aether.Config[btnInfo.chave]
-            btn.Text = Aether.Config[btnInfo.chave] and "⏹ " .. btnInfo.texto:sub(3) or btnInfo.texto
-            btn.BackgroundColor3 = Aether.Config[btnInfo.chave] and Color3.fromRGB(239, 68, 68) or btnInfo.cor
+            Config[btnInfo.chave] = not Config[btnInfo.chave]
+            btn.Text = Config[btnInfo.chave] and "⏹ " .. btnInfo.texto:sub(3) or btnInfo.texto
+            btn.BackgroundColor3 = Config[btnInfo.chave] and Color3.fromRGB(239, 68, 68) or btnInfo.cor
             
-            StarterGui:SetCore("SendNotification", {
-                Title = Aether.Config[btnInfo.chave] and "✅ Ativado" or "⏹ Desativado",
-                Text = btnInfo.texto:sub(3),
-                Duration = 2
-            })
+            Notify(Config[btnInfo.chave] and "✅ Ativado" or "⏹ Desativado", btnInfo.texto:sub(3), 2)
         end)
     end
     
@@ -509,19 +512,16 @@ function Aether:CriarGUI()
     -- SISTEMA DE TROCA DE ABAS
     -- ============================================
     local function SelectTab(index)
-        -- Esconde todos os conteúdos
         for _, content in ipairs(tabContents) do
             if content then
                 content.Visible = false
             end
         end
         
-        -- Mostra o conteúdo selecionado
         if tabContents[index] then
             tabContents[index].Visible = true
         end
         
-        -- Atualiza cores das abas
         for i, btn in ipairs(tabButtons) do
             if i == index then
                 btn.BackgroundColor3 = Color3.fromRGB(100, 50, 200)
@@ -533,14 +533,8 @@ function Aether:CriarGUI()
         end
     end
     
-    -- Armazena conteúdos
     tabContents = {
         homeContent,
         farmContent,
         teleportContent,
-        itemsContent,
-        settingsContent
-    }
     
-    -- Conecta botões das abas
-    for i, btn in ipairs(
