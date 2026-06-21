@@ -1,16 +1,24 @@
--- Script de teste mínimo
+-- Script de teste com StarterGui
 wait(2)
 
 print("✅ Script carregado! Criando GUI...")
 
-local screen = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+-- Usando StarterGui em vez de PlayerGui
+local StarterGui = game:GetService("StarterGui")
+
+local screen = StarterGui
+
+-- Cria um ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "AetherTest"
+gui.Parent = screen
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 300, 0, 200)
 frame.Position = UDim2.new(0.5, -150, 0.5, -100)
 frame.BackgroundColor3 = Color3.fromRGB(20, 10, 40)
 frame.BackgroundTransparency = 0.1
-frame.Parent = screen
+frame.Parent = gui
 
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
@@ -25,4 +33,4 @@ label.Font = Enum.Font.GothamBold
 label.BackgroundTransparency = 1
 label.Parent = frame
 
-print("✅ GUI criada com sucesso!")
+print("✅ GUI criada no StarterGui!")
